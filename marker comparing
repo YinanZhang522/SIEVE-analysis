@@ -1,0 +1,180 @@
+gene.spBM1<-read.csv("C:/Users/zyn05/Desktop/gene-select/sp indiv/spBM1-genelist.csv") 
+
+filename<-c("hvg-genelist.csv","scmap-genelist.csv","scran-genelist.csv","schs-genelist.csv","sct-genelist.csv","vst-genelist.csv","disp-genelist.csv","rogue-genelist.csv","rogue_norm-genelist.csv")
+path <- getwd()
+filePath <- sapply(filename, function(x){ 
+  paste(path,x,sep='/')})   
+gene <- lapply(filePath, function(x){
+  read.csv(x,row.names = 1)})
+geneuse<-list()
+for (i in 1:9){
+  a_res<-table(as.vector(as.matrix(gene[[i]])))
+  geneuse[[i]]<-names(a_res[a_res==50])
+}
+
+
+sp.integrated=abc.hspc
+sp.integrated=NormalizeData(sp.integrated, verbose=FALSE)
+sp.integrated=ScaleData(sp.integrated, verbose=FALSE)
+
+markergene<-list()
+rightorder<-list()
+markerpart<-list()
+overlapcount<-matrix(nrow = 9,ncol=1)
+for (k in 1:9){
+  gene.use<-gene.spBM1[,k]
+  sp.integrated=RunPCA(sp.integrated, npcs=30, verbose=FALSE, features=gene.use)
+  sp.integrated=RunUMAP(sp.integrated, reduction="pca", dims=1:8)
+  sp.integrated=FindNeighbors(sp.integrated, dims=1:10)
+  sp.integrated=FindClusters(object=sp.integrated, resolution=0.6, verbose=FALSE)
+  
+  markergene[[k]]<-FindAllMarkers(sp.integrated,assay = "RNA")
+  for (i in 1:nrow(markergene[[k]])){
+    if (markergene[[k]]$avg_logFC[i]<=0){
+      markergene[[k]]$abs_FC[i]<--markergene[[k]]$avg_logFC[i]
+    }else{
+      markergene[[k]]$abs_FC[i]<-markergene[[k]]$avg_logFC[i]
+    }
+  }
+  
+  rightorder[[k]]<-markergene[[k]][order(markergene[[k]]$abs_FC,decreasing = T),]
+  markerpart[[k]]<-rownames(rightorder[[k]])[markergene[[k]]$abs_FC>=1]
+  overlapcount[k,]<-sum(markerpart[[k]]%in%gene.use)
+}
+write.table(rightorder[[9]],"rogue_n-marker.b.txt")
+
+rownames(rightorder[[1]])[markergene[[1]]$abs_FC>=1]
+rownames(rightorder[[1]])[c(1:length(gene.use))]
+rownames(rightorder[[k]])[c(1:2000)]
+
+marker.promote<-matrix(nrow=2000,ncol=18)
+
+genes.use<-gene.spBM1[,4]
+
+sp.integrated=RunPCA(sp.integrated, npcs=30, verbose=FALSE, features=genes.use)
+sp.integrated=RunUMAP(sp.integrated, reduction="pca", dims=1:8)
+DimPlot(sp.integrated, reduction="umap", group.by="orig.ident", cols=c(
+  "lightgreen","gold","chocolate","red","cyan2","blue","forestgreen","magenta"))
+sp.integrated=FindNeighbors(sp.integrated, dims=1:10)
+sp.integrated=FindClusters(object=sp.integrated, resolution=0.6, verbose=FALSE)
+
+DimPlot(sp.integrated, reduction="umap", group.by="seurat_clusters")
+
+markergene<-FindAllMarkers(sp.integrated,assay = "RNA")
+for (i in 1:nrow(markergene)){
+  if (markergene$avg_logFC[i]<=0){
+    markergene$abs_FC[i]<--markergene$avg_logFC[i]
+  }else{
+    markergene$abs_FC[i]<-markergene$avg_logFC[i]
+  }
+}
+rightorder<-markergene[order(markergene$abs_FC,decreasing = T),]
+markerpart<-rownames(rightorder)[c(1:2000)]
+clu<-rightorder$cluster[c(1:2000)]
+
+marker.promote[,17]<-markerpart
+marker.promote[,18]<-clu
+
+write.table(rightorder,"rogue_n-marker.txt")
+
+write.csv(marker.promote,"marker.before.csv")
+
+
+
+
+
+setwd("C:/Users/zyn05/Desktop/gene-select/spBM1 predict/")
+gene.spBM1<-read.csv("C:/Users/zyn05/Desktop/gene-select/sp indiv/spBM1-genelist.csv") 
+
+filename<-c("hvg-marker.txt","scmap-marker.txt","scran-marker.txt","schs-marker.txt","sct-marker.txt","vst-marker.txt","disp-marker.txt","rogue-marker.txt","rogue_n-marker.txt")
+path <- getwd()
+filePath <- sapply(filename, function(x){ 
+  paste(path,x,sep='/')})   
+data <- lapply(filePath, function(x){read.table(x)})
+uniqmarker<-matrix(nrow=15,ncol=9)
+for (i in 1:9){
+  uniqmarker[1,i]<-length(unique.default(data[[i]]$gene[data[[i]]$abs_FC>1&data[[i]]$p_val_adj<0.05]))
+  uniqmarker[2,i]<-sum(unique.default(data[[i]]$gene[data[[i]]$abs_FC>1&data[[i]]$p_val_adj<0.05])%in%gene.spBM1[,i])
+  
+  uniqmarker[3,i]<-length(unique.default(data[[i]]$gene[data[[i]]$abs_FC>0.5&data[[i]]$p_val_adj<0.05]))
+  uniqmarker[4,i]<-sum(unique.default(data[[i]]$gene[data[[i]]$abs_FC>0.5&data[[i]]$p_val_adj<0.05])%in%gene.spBM1[,i])
+}
+
+filename2<-c("hvg-marker.p.txt","scmap-marker.p.txt","scran-marker.p.txt","schs-marker.p.txt","sct-marker.p.txt","vst-marker.p.txt","disp-marker.p.txt","rogue-marker.p.txt","rogue_n-marker.p.txt")
+path <- getwd()
+filePath2 <- sapply(filename2, function(x){ 
+  paste(path,x,sep='/')})   
+data2 <- lapply(filePath2, function(x){read.table(x)})
+for (i in 1:9){
+  uniqmarker[5,i]<-length(unique.default(data2[[i]]$gene[data2[[i]]$abs_FC>1&data[[i]]$p_val_adj<0.05]))
+  uniqmarker[6,i]<-sum(unique.default(data2[[i]]$gene[data2[[i]]$abs_FC>1&data[[i]]$p_val_adj<0.05])%in%geneuse[[i]])
+  
+  uniqmarker[7,i]<-length(unique.default(data2[[i]]$gene[data2[[i]]$abs_FC>0.5&data[[i]]$p_val_adj<0.05]))
+  uniqmarker[8,i]<-sum(unique.default(data2[[i]]$gene[data2[[i]]$abs_FC>0.5&data[[i]]$p_val_adj<0.05])%in%geneuse[[i]])
+}
+
+
+TeaTasting <-
+  matrix(c(100, 1900 ,119, 12541),
+         nrow = 2,
+         dimnames = list(HVG = c("Y", "N"),
+                         MARKER = c("Y", "N")))
+fisher.test(TeaTasting, alternative = "greater")
+
+TeaTasting <-
+  matrix(c( 119, 12541,100, 1900),
+         nrow = 2,
+         dimnames = list(MARKER = c("Y", "N"),HVG = c("Y", "N")
+         ))
+fisher.test(TeaTasting, alternative = "greater")
+
+
+
+fisher<-list()
+for (i in 1:9){
+  a<-uniqmarker[1,i]
+  b<-uniqmarker[2,i]
+  
+  TeaTasting <-matrix(c(b,a-b,2000-b,14660-a-2000+b),
+                      nrow = 2,
+                      dimnames = list(HVG = c("Y", "N"),
+                                      MARKER = c("Y", "N")))
+  fisher[[i]]<-fisher.test(TeaTasting)
+  uniqmarker[9,i]<-log(fisher[[i]]$p.value)
+}
+
+for (i in 1){
+  a<-uniqmarker[5,i]
+  b<-uniqmarker[6,i]
+  c<-length(geneuse[[i]])
+  TeaTasting <-matrix(c(b,a-b,c-b,14660-a-c+b),
+                      nrow = 2,
+                      dimnames = list(HVG = c("Y", "N"),
+                                      MARKER = c("Y", "N")))
+  fisher[[i]]<-fisher.test(TeaTasting,alternative = "two.sided")
+  uniqmarker[10,i]<-log(fisher[[i]]$p.value)
+}
+
+for (i in 1:9){
+  a<-uniqmarker[3,i]
+  b<-uniqmarker[4,i]
+  
+  TeaTasting <-matrix(c(b,a-b,2000-b,14660-a-2000+b),
+                      nrow = 2,
+                      dimnames = list(HVG = c("Y", "N"),
+                                      MARKER = c("Y", "N")))
+  fisher[[i]]<-fisher.test(TeaTasting, alternative = "two.sided")
+  uniqmarker[11,i]<-log(fisher[[i]]$p.value)
+}
+
+for (i in 1:9){
+  a<-uniqmarker[7,i]
+  b<-uniqmarker[8,i]
+  c<-length(geneuse[[i]])
+  TeaTasting <-matrix(c(b,a-b,c-b,14660-a-c+b),
+                      nrow = 2,
+                      dimnames = list(HVG = c("Y", "N"),
+                                      MARKER = c("Y", "N")))
+  fisher[[i]]<-fisher.test(TeaTasting, alternative = "two.sided")
+  uniqmarker[12,i]<-log(fisher[[i]]$p.value)
+}
