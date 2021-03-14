@@ -1,0 +1,8 @@
+#sankey
+library(ggalluvial)
+setwd("C:/Users/zyn05/Desktop/gene-select/spBM1 predict/")
+mydata=read.csv("vst-predict50.csv",row.names = 1)
+
+mydata$cluster<-factor(mydata$cluster)
+
+ggplot(mydata,aes(axis1=cluster,axis2=predict))+labs(title="vst")+geom_flow(aes(fill=cluster))+geom_stratum(width=1/3)+theme_classic()
